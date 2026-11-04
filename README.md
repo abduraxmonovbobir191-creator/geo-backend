@@ -1,18 +1,14 @@
 # Geo Backend
 
-Node.js + Express + Socket.io backend for real-time location sharing and chat.
+Node.js + Express + Socket.io + PostgreSQL
 
-## Features
-- Real-time location updates (WebSocket)
-- Chat messages
-- Online users tracking
-- Ready for Nex ID auth integration
-- Later: PostgreSQL, Redis, subscription checks
+## Setup
+1. Install PostgreSQL
+2. Create database: `createdb geoapp`
+3. Copy `.env.example` to `.env` and set DATABASE_URL
+4. `npm install`
+5. `npm run dev`
 
-## Run
-```bash
-npm install
-npm run dev
-```
-
-Server: http://localhost:3000
+## Tables
+- users (id, name, lat, lng)
+- messages (from, to, text)

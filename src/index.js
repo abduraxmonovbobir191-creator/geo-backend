@@ -3,79 +3,62 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const { pool, initDb } = require('./db');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: '*' }
-});
+const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
 app.use(express.json());
 
-// In-memory store (later replace with PostgreSQL / Redis)
-const users = new Map(); // userId -> { lat, lng, name, socketId }
-const chats = [];
+// Init DB on start
+initDb().catch(console.error);
 
-app.get('/', (req, res) => {
-  res.json({ status: 'Geo Backend is running' });
-});
-
-// Simple health
-app.get('/health', (req, res) => {
-  res.json({ ok: true, usersOnline: users.size });
+app.get('/', (req, res) => res.json({ status: 'Geo Backend running' }));
+app.get('/health', async (req, res) => {
+  const { rows } = await pool.query('SELECT COUNT(*) FROM users');
+  res.json({ ok: true, users: rows[0].count });
 });
 
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('Connected:', socket.id);
 
-  // Join with user info (later from Nex ID)
-  socket.on('join', (data) => {
+  socket.on('join', async (data) => {
     const { userId, name } = data;
-    users.set(userId, { name, socketId: socket.id, lat: null, lng: null });
     socket.userId = userId;
+    await pool.query(
+      `INSERT INTO users (id, name) VALUES ($1, $2)
+       ON CONFLICT (id) DO UPDATE SET name = $2, updated_at = NOW()`,
+      [userId, name]
+    );
     socket.join(userId);
-    io.emit('users:update', Array.from(users.entries()));
   });
 
-  // Real-time location update
-  socket.on('location:update', (data) => {
+  socket.on('location:update', async (data) => {
     const { userId, lat, lng } = data;
-    if (users.has(userId)) {
-      const user = users.get(userId);
-      user.lat = lat;
-      user.lng = lng;
-      users.set(userId, user);
-      // Broadcast to all (or only friends later)
-      io.emit('location:update', { userId, lat, lng, name: user.name });
-    }
+    await pool.query(
+      'UPDATE users SET lat = $1, lng = $2, updated_at = NOW() WHERE id = $3',
+      [lat, lng, userId]
+    );
+    io.emit('location:update', data);
   });
 
-  // Chat message
-  socket.on('chat:message', (data) => {
-    const msg = {
-      from: data.from,
-      to: data.to,
-      text: data.text,
-      timestamp: Date.now()
-    };
-    chats.push(msg);
-    // Send to recipient
-    io.to(data.to).emit('chat:message', msg);
-    // Echo to sender
+  socket.on('chat:message', async (data) => {
+    const { from, to, text } = data;
+    await pool.query(
+      'INSERT INTO messages (from_user, to_user, text) VALUES ($1, $2, $3)',
+      [from, to, text]
+    );
+    const msg = { from, to, text, timestamp: Date.now() };
+    io.to(to).emit('chat:message', msg);
     socket.emit('chat:message', msg);
   });
 
   socket.on('disconnect', () => {
-    if (socket.userId) {
-      users.delete(socket.userId);
-      io.emit('users:update', Array.from(users.entries()));
-    }
-    console.log('User disconnected:', socket.id);
+    console.log('Disconnected:', socket.id);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Geo Backend running on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server on port ${PORT}`));
