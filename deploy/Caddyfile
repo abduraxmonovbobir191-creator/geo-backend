@@ -1,0 +1,17 @@
+# HTTPS certificates are obtained automatically from Let's Encrypt for every name below,
+# as long as its DNS A record points at this server.
+
+api.{$DOMAIN} {
+	encode gzip
+	reverse_proxy api:3000
+}
+
+tiles.{$DOMAIN} {
+	reverse_proxy tilecache:80
+}
+
+{$DOMAIN}, map.{$DOMAIN} {
+	encode gzip
+	root * /srv/site
+	file_server
+}

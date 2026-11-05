@@ -22,6 +22,9 @@ export const config = {
   jwtExpiresIn: env.JWT_EXPIRES_IN || '30d',
   corsOrigin: env.CORS_ORIGIN || '*',
   geocoderUrl: env.GEOCODER_URL || 'https://nominatim.openstreetmap.org',
+  // Asked when the main geocoder is down or finds nothing, e.g. an own server that only
+  // covers one country, backed by the public OpenStreetMap server for the rest of the world.
+  geocoderFallbackUrl: env.GEOCODER_FALLBACK_URL || null,
   geocoderUserAgent: env.GEOCODER_USER_AGENT || 'NexMap/0.1 (self-hosted)',
   rateLimit: {
     windowMs: Number(env.RATE_LIMIT_WINDOW_MS || 60_000),

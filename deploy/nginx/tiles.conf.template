@@ -1,0 +1,24 @@
+# Caches rendered map tiles on disk so each tile is drawn by tileserver-gl only once.
+proxy_cache_path /cache levels=1:2 keys_zone=tiles:100m max_size=${TILE_CACHE_SIZE} inactive=180d use_temp_path=off;
+
+server {
+  listen 80;
+
+  location / {
+    proxy_pass http://tileserver:8080;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-Proto https;
+
+    proxy_cache tiles;
+    proxy_cache_key $uri;
+    proxy_cache_valid 200 30d;
+    proxy_cache_valid 404 1m;
+    # Many phones asking for the same new tile at once trigger only one render.
+    proxy_cache_lock on;
+    proxy_cache_use_stale error timeout updating http_500 http_502 http_503;
+
+    add_header X-Cache $upstream_cache_status always;
+    add_header Access-Control-Allow-Origin * always;
+    expires 7d;
+  }
+}

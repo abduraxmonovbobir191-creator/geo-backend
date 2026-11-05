@@ -23,8 +23,8 @@ const reverseSchema = z.object({
   lang: z.string().max(20).optional(),
 });
 
-async function callGeocoder(path, params, lang) {
-  const url = new URL(path, config.geocoderUrl);
+async function callOne(baseUrl, path, params, lang) {
+  const url = new URL(path, baseUrl);
   for (const [k, v] of Object.entries({ format: 'jsonv2', addressdetails: '1', ...params })) {
     if (v !== undefined) url.searchParams.set(k, String(v));
   }
@@ -42,6 +42,32 @@ async function callGeocoder(path, params, lang) {
   }
   return response.json();
 }
+
+/**
+ * Asks the main geocoder, then the fallback one when the main one fails or `isEmpty(result)`.
+ * An own server covering one country thus still answers for the rest of the world.
+ */
+async function callGeocoder(path, params, lang, isEmpty) {
+  const fallback = config.geocoderFallbackUrl;
+  let result;
+  try {
+    result = await callOne(config.geocoderUrl, path, params, lang);
+  } catch (err) {
+    if (!fallback) throw err;
+    return callOne(fallback, path, params, lang);
+  }
+  if (fallback && isEmpty(result)) {
+    try {
+      return await callOne(fallback, path, params, lang);
+    } catch {
+      return result;
+    }
+  }
+  return result;
+}
+
+const noResults = (r) => !Array.isArray(r) || r.length === 0;
+const noAddress = (r) => !r || Boolean(r.error);
 
 function serializeResult(r) {
   return {
@@ -63,7 +89,7 @@ router.get(
       // A ~50 km box around the point; results inside rank higher but others still show.
       params.viewbox = [q.lng - 0.5, q.lat + 0.5, q.lng + 0.5, q.lat - 0.5].join(',');
     }
-    const results = await callGeocoder('/search', params, q.lang);
+    const results = await callGeocoder('/search', params, q.lang, noResults);
     res.json({ results: Array.isArray(results) ? results.map(serializeResult) : [] });
   }),
 );
@@ -72,7 +98,7 @@ router.get(
   '/reverse',
   route(async (req, res) => {
     const q = parse(reverseSchema, req.query);
-    const result = await callGeocoder('/reverse', { lat: q.lat, lon: q.lng }, q.lang);
+    const result = await callGeocoder('/reverse', { lat: q.lat, lon: q.lng }, q.lang, noAddress);
     res.json({ result: result && !result.error ? serializeResult(result) : null });
   }),
 );

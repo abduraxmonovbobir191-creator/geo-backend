@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nex Map – xarita, do'stlar va sport bir ilovada</title>
+  <meta name="description" content="Nex Map: manzil va joylarni qidiring, do'stlaringiz qayerdaligini jonli ko'ring, yugurish va velosiped mashg'ulotlarini GPS bilan yozing. Bepul ilova va ochiq API.">
+  <link rel="canonical" href="https://nexecos.com/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Nex Map – xarita, do'stlar va sport bir ilovada">
+  <meta property="og:description" content="Manzil qidirish, do'stlarning jonli joylashuvi va mashg'ulotlarni yozish bitta ilovada.">
+  <meta property="og:url" content="https://nexecos.com/">
+  <meta name="theme-color" content="#2f6bff">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%232f6bff' d='M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7z'/%3E%3C/svg%3E">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Nex Map",
+    "operatingSystem": "Android",
+    "applicationCategory": "TravelApplication",
+    "description": "Xarita, do'stlarning jonli joylashuvi va mashg'ulotlarni yozish bitta ilovada.",
+    "url": "https://nexecos.com/",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "UZS" }
+  }
+  </script>
+  <style>
+    :root {
+      --bg: #ffffff; --surface: #f3f6fd; --text: #121826; --muted: #5b6475;
+      --brand: #2f6bff; --brand-text: #ffffff; --border: #e2e7f1;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0d1117; --surface: #161c27; --text: #eef1f7; --muted: #a1a9b8; --brand: #5b8cff; --border: #263043; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    a { color: var(--brand); }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+    .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; color: var(--text); text-decoration: none; }
+    .logo svg { width: 30px; height: 30px; }
+    nav a { margin-left: 18px; color: var(--muted); text-decoration: none; }
+    .hero { padding: 56px 0 40px; text-align: center; }
+    h1 { font-size: clamp(30px, 6vw, 52px); line-height: 1.1; margin: 0 0 16px; letter-spacing: -0.02em; }
+    .lead { font-size: 19px; color: var(--muted); max-width: 640px; margin: 0 auto 28px; }
+    .btn { display: inline-block; background: var(--brand); color: var(--brand-text); padding: 14px 26px; border-radius: 14px; font-weight: 600; text-decoration: none; }
+    .btn.secondary { background: transparent; color: var(--brand); border: 1px solid var(--border); margin-left: 8px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; padding: 24px 0 48px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 22px; }
+    .card h2 { font-size: 20px; margin: 8px 0; }
+    .card p, .card li { color: var(--muted); }
+    .card ul { padding-left: 18px; margin: 0; }
+    .icon { font-size: 28px; }
+    .api { background: var(--surface); border-radius: 18px; padding: 24px; margin-bottom: 48px; border: 1px solid var(--border); }
+    pre { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px; overflow-x: auto; font-size: 14px; }
+    footer { border-top: 1px solid var(--border); padding: 24px 0 40px; color: var(--muted); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="logo" href="/">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#2f6bff" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7z"/><text x="12" y="12.5" text-anchor="middle" font-size="7" font-weight="900" fill="#fff" font-family="system-ui">N</text></svg>
+        Nex Map
+      </a>
+      <nav><a href="#imkoniyatlar">Imkoniyatlar</a><a href="#api">API</a></nav>
+    </header>
+
+    <section class="hero">
+      <h1>Xarita, do'stlar va sport<br>bitta ilovada</h1>
+      <p class="lead">Manzil va joylarni toping, do'stlaringiz qayerdaligini jonli ko'ring, yugurish va velosiped
+        mashg'ulotlaringizni yozib boring. Bepul.</p>
+      <a class="btn" href="/nex-map.apk">Android uchun yuklab olish</a>
+      <a class="btn secondary" href="#api">Dasturchilar uchun</a>
+    </section>
+
+    <section id="imkoniyatlar" class="grid">
+      <article class="card">
+        <div class="icon">🗺️</div>
+        <h2>Xarita va qidiruv</h2>
+        <ul>
+          <li>Butun dunyo xaritasi</li>
+          <li>Manzil, kafe, park va do'konlarni qidirish</li>
+          <li>Yaqin atrofdagi joylar va check-in</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="icon">👥</div>
+        <h2>Do'stlar jonli</h2>
+        <ul>
+          <li>Do'stlaringiz xaritada real vaqtda</li>
+          <li>Batareya, tezlik va onlayn holati</li>
+          <li>Ghost rejim: joylashuvingizni muzlatib qo'ying</li>
+          <li>Do'stlar bilan chat</li>
+        </ul>
+      </article>
+      <article class="card">
+        <div class="icon">🏃</div>
+        <h2>Mashg'ulotlar</h2>
+        <ul>
+          <li>Yugurish, velosiped, piyoda yurish va sayohatni GPS bilan yozish</li>
+          <li>Masofa, vaqt, temp va balandlik</li>
+          <li>Lenta, kudos va haftalik statistika</li>
+        </ul>
+      </article>
+    </section>
+
+    <section id="api" class="api">
+      <h2>Nex Map API</h2>
+      <p>Botlar, saytlar va boshqa ilovalar Nex Map bilan ishlashi mumkin. Ilovada
+        <b>Profil → Dasturchilar uchun API</b> bo'limida kalit yarating va so'rovlarga qo'shing:</p>
+      <pre>curl https://api.nexecos.com/v1/friends -H "X-API-Key: nex_..."</pre>
+      <p>To'liq hujjat: <a href="https://api.nexecos.com/docs">api.nexecos.com/docs</a></p>
+    </section>
+
+    <footer>
+      © Nex Map · Xarita ma'lumotlari © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> hissadorlari,
+      <a href="https://protomaps.com">Protomaps</a>
+    </footer>
+  </div>
+</body>
+</html>
