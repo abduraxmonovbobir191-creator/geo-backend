@@ -74,6 +74,19 @@ Do'st qanday ko'rishini **server** hal qiladi (aniq nuqta xira yoki muzlatilgan 
 - `PUT /v1/me/status {text, hours}`: qisqa status ("Kofe"), o'zi tugaydi (standart 8 soat).
 - Socket.IO: `friend:location` har bir do'stga uning ko'rinishida yuboriladi; rejim o'zgarsa `friend:location_hidden`.
 
+## Biznes joylar (Yandex / Snap Map uslubida)
+
+- `GET /v1/places/categories`, `GET /v1/places/nearby?lat&lng&radius&category=restaurant&q=&openNow=true`: kategoriya tugmalari, nom bo'yicha qidiruv, "hozir ochiq".
+- **Biznes kartochkasi:** tavsif, telefon, sayt, rasmlar, narx darajasi, ish vaqti (`open`), reyting va sharhlar. Reyting va sharhlar pulga bog'liq emas;
+  egasi o'z joyiga baho bera olmaydi (`PUT /v1/places/{id}/reviews`).
+- **Egasi bo'lish:** `POST /v1/business/places/{id}/claim` (Nex ID tekshiruvi 1+ kerak, birinchi so'ragan oladi). Tahrir: `PATCH /v1/business/places/{id}`.
+- **Pullik Top 1–3:** `POST /v1/business/places/{id}/promotions {plan, price, key}`. Narx Nex ID hamyonidan yechiladi (`GET /v1/business/plans`).
+  Har bir Top o'rin kategoriya va ~5 km hudud bo'yicha bitta egaga beriladi (band bo'lsa 409 `slot_taken`, pul qaytadi). Ro'yxatda eng tepada
+  ko'pi bilan 3 ta, doim `ad: true` belgisi bilan; qolganlar masofa bo'yicha.
+- **3D Branded Pin:** logo yoki 3D model linki qo'shilgach `pin_month` sotib olinadi; `brandedPin` faqat muddat davomida ko'rinadi.
+- **Statistika (pullik qo'shimcha `biz_stats`):** `GET /v1/business/places/{id}/stats`: ko'rishlar, kartochka ochilishi, pin bosilishi, marshrut, qo'ng'iroq.
+  Faqat sonlar saqlanadi, kim ko'rgani saqlanmaydi. Mijoz ilovasi `POST /v1/places/{id}/events {kind}` yuboradi.
+
 ## Imkoniyatlar
 
 | Bo'lim | Endpointlar |
