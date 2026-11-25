@@ -1,0 +1,20 @@
+{
+  "options": {
+    "paths": {
+      "root": "/data",
+      "fonts": "fonts",
+      "styles": "styles",
+      "pmtiles": "tiles"
+    },
+    "serveAllFonts": true,
+    "maxScaleFactor": 2,
+    "staticAttributionText": "© OpenStreetMap contributors · Protomaps"
+  },
+  "styles": {
+    "light": { "style": "light.json", "tilejson": { "format": "png" } },
+    "dark": { "style": "dark.json", "tilejson": { "format": "png" } }
+  },
+  "data": {
+    "planet": { "pmtiles": "planet.pmtiles" }
+  }
+}

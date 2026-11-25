@@ -1,0 +1,86 @@
+# Production stack for one server. Settings come from deploy/.env (created by install.sh).
+#   docker compose up -d                    API, database, address search, website
+#   docker compose --profile maps up -d     plus the map tile server (after download-map.sh)
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nexmap
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: nexmap
+    volumes:
+      - ${DATA_DIR:?set in .env}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexmap"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build: ..
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://nexmap:${POSTGRES_PASSWORD}@db:5432/nexmap
+      JWT_SECRET: ${JWT_SECRET:?set in .env}
+      CORS_ORIGIN: "*"
+      # Own address search first; the public OpenStreetMap server covers the rest of the world.
+      GEOCODER_URL: http://nominatim:8080
+      GEOCODER_FALLBACK_URL: https://nominatim.openstreetmap.org
+      GEOCODER_USER_AGENT: NexMap/1.0 (+https://${DOMAIN})
+
+  # Address search (Nominatim) for the region in NOMINATIM_PBF_URL. The first start imports the
+  # data: about an hour for Uzbekistan, and the API uses the public server until it is ready.
+  nominatim:
+    image: mediagis/nominatim:5.3
+    restart: unless-stopped
+    shm_size: 2g
+    environment:
+      PBF_URL: ${NOMINATIM_PBF_URL}
+      REPLICATION_URL: ${NOMINATIM_REPLICATION_URL}
+      NOMINATIM_PASSWORD: ${NOMINATIM_PASSWORD:?set in .env}
+      THREADS: ${NOMINATIM_THREADS:-6}
+    volumes:
+      - ${DATA_DIR}/nominatim:/var/lib/postgresql
+
+  # Draws PNG map tiles from the PMTiles file that download-map.sh fetches.
+  tileserver:
+    image: maptiler/tileserver-gl:v5.6.0
+    profiles: [maps]
+    restart: unless-stopped
+    command: ["--config", "/data/config.json"]
+    environment:
+      # Only build absolute URLs (TileJSON, style.json) for our own domain.
+      TILESERVER_GL_ALLOWED_HOSTS: tiles.${DOMAIN}
+    volumes:
+      - ./tileserver:/data:ro
+      - ${DATA_DIR}/tiles:/data/tiles:ro
+
+  tilecache:
+    image: nginx:1.30-alpine
+    profiles: [maps]
+    restart: unless-stopped
+    depends_on: [tileserver]
+    environment:
+      TILE_CACHE_SIZE: ${TILE_CACHE_SIZE:-100g}
+    volumes:
+      - ./nginx/tiles.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ${TILE_CACHE_DIR:-/srv/nexmap/tile-cache}:/cache
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv/site:ro
+      - ${DATA_DIR}/caddy:/data
