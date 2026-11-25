@@ -1,0 +1,8 @@
+{
+  "name": "nex-map-style",
+  "private": true,
+  "type": "module",
+  "description": "Generates Nex Map's own light and dark map styles (node nex-style.mjs)",
+  "scripts": { "style": "node nex-style.mjs" },
+  "dependencies": { "@protomaps/basemaps": "5.7.2" }
+}

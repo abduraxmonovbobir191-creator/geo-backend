@@ -31,6 +31,8 @@ services:
       NEXID_CLIENT_ID: ${NEXID_CLIENT_ID:-}
       NEXID_CLIENT_SECRET: ${NEXID_CLIENT_SECRET:-}
       SERVICE_KEYS: ${SERVICE_KEYS:-}
+      # Own routing server (profile `routing`); leave empty until its tiles are in place.
+      ROUTING_URL: ${ROUTING_URL:-}
       CORS_ORIGIN: "*"
       # Own address search first; the public OpenStreetMap server covers the rest of the world.
       GEOCODER_URL: http://nominatim:8080
@@ -50,6 +52,20 @@ services:
       THREADS: ${NOMINATIM_THREADS:-6}
     volumes:
       - ${DATA_DIR}/nominatim:/var/lib/postgresql
+
+  # Routing on our own world tiles (built by planet/build-world.sh on a big server, then copied to ${DATA_DIR}/valhalla).
+  valhalla:
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    profiles: [routing]
+    restart: unless-stopped
+    environment:
+      use_tiles_ignore_pbf: "True"
+      force_rebuild: "False"
+      build_tar: "True"
+      serve_tiles: "True"
+      server_threads: ${VALHALLA_THREADS:-8}
+    volumes:
+      - ${DATA_DIR}/valhalla:/custom_files
 
   # Draws PNG map tiles from the PMTiles file that download-map.sh fetches.
   tileserver:

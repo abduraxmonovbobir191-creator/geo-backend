@@ -87,6 +87,14 @@ Do'st qanday ko'rishini **server** hal qiladi (aniq nuqta xira yoki muzlatilgan 
 - **Statistika (pullik qo'shimcha `biz_stats`):** `GET /v1/business/places/{id}/stats`: ko'rishlar, kartochka ochilishi, pin bosilishi, marshrut, qo'ng'iroq.
   Faqat sonlar saqlanadi, kim ko'rgani saqlanmaydi. Mijoz ilovasi `POST /v1/places/{id}/events {kind}` yuboradi.
 
+## Marshrut va o'z xaritamiz
+
+- `POST /v1/route {from, to, via[], mode: drive|walk|bike, toPlaceId?}`: o'z Valhalla serverimizda marshrut (`ROUTING_URL`), masofa, vaqt, chiziq va qadamlar.
+  Javobda `suggestions`: yo'l ustidagi (300 m ichida) sotib olingan Top joylar, doim `ad: true` bilan: "oraliq to'xtash" (Add stop) uchun
+  mijoz ilova `via` bilan qayta so'raydi. Piyoda yo'lda takliflar yo'q.
+- Xarita ko'rinishi bizniki: `deploy/tileserver/nex-style.mjs` (yorug' va qorong'i, 3D binolar z14+, ochilishda 45° qiyalik).
+- Butun dunyo marshrut va qidiruv: `deploy/planet/README.md` (soatbay katta serverda quriladi, asosiy serverga ko'chiriladi).
+
 ## Imkoniyatlar
 
 | Bo'lim | Endpointlar |

@@ -46,6 +46,8 @@ export const config = {
       .map((p) => p.trim().split(':'))
       .filter((p) => p.length === 2 && p[0] && p[1]),
   ),
+  // Own Valhalla routing server (deploy/planet). Without it /v1/route answers 503 routing_unavailable.
+  routingUrl: (env.ROUTING_URL || '').replace(/\/+$/, ''),
   rateLimit: {
     windowMs: Number(env.RATE_LIMIT_WINDOW_MS || 60_000),
     // Requests per window for API-key clients (third-party developers).
