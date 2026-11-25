@@ -61,6 +61,19 @@ Pul faqat Nex ID'da: Nex Map tanga sotmaydi va saqlamaydi, har bir to'lov Nex ID
 - Nexly va Nexgram'da ham shu tugma: `GET /internal/v1/shop`, `POST /internal/v1/shop/buy` (`X-Service-Key` + `X-Nexid-Sub`).
   Ilova foydalanuvchidan tasdiq olgandan keyingina chaqiradi; xarid `purchases.source` da `nexly` / `nexgramm` deb yoziladi.
 
+## Jonli holat va har bir do'st uchun maxfiylik
+
+Do'st qanday ko'rishini **server** hal qiladi (aniq nuqta xira yoki muzlatilgan do'stga umuman yetib bormaydi).
+
+- `PUT /v1/friends/{userId}/sharing {mode}`: `precise` (aniq), `blurred` (~1 km katak, 700 m radius), `frozen` (shu paytdagi nuqta qotib qoladi),
+  `hidden` (hech narsa ko'rinmaydi) yoki `default`. `GET /v1/friends` da `sharing` (siz unga qanday ko'rinasiz) va `location` (u sizga nimani ko'rsatgan).
+- `GET/PUT /v1/me/sharing {defaultMode, activity, steps}`: umumiy rejim va sezgir qo'shimchalar (harakat holati, quvvatlanish, "N daqiqadan beri shu yerda";
+  qadamlar alohida). Hammasi **standartda o'chiq**; xira rejimda aniq joyni oshkor qiladigan maydonlar berilmaydi.
+- `PUT /v1/me/location` endi `activity` (still | walking | vehicle | sleeping), `isCharging`, `stepsToday` ham qabul qiladi; "qancha vaqtdan beri" ni
+  server o'zi hisoblaydi (80 m doira).
+- `PUT /v1/me/status {text, hours}`: qisqa status ("Kofe"), o'zi tugaydi (standart 8 soat).
+- Socket.IO: `friend:location` har bir do'stga uning ko'rinishida yuboriladi; rejim o'zgarsa `friend:location_hidden`.
+
 ## Imkoniyatlar
 
 | Bo'lim | Endpointlar |

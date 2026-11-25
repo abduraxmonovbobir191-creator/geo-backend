@@ -1,33 +1,74 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { many, one } from '../db.js';
+import { many, one, query } from '../db.js';
 import { badRequest, conflict, forbidden, idParam, notFound, parse, route } from '../lib/http.js';
 import { PUBLIC_USER_COLUMNS, emitToUsers, publicUser } from '../lib/social.js';
-import { serializeLocation } from './me.js';
+import { MODES, viewOf, viewsForFriends } from '../lib/privacy.js';
 
 const router = Router();
 
-// Friends with their last shared location (null if they never shared one).
+// Friends with the location each of them chose to show you (precise, blurred, frozen or none) and how you show yourself to them.
 router.get(
   '/',
   route(async (req, res) => {
+    const me = req.auth.userId;
     const rows = await many(
       `SELECT ${PUBLIC_USER_COLUMNS}, f.accepted_at,
-              l.user_id, l.lat, l.lng, l.accuracy, l.speed, l.heading, l.battery, l.updated_at
+              u.share_mode AS owner_default, u.share_activity, u.share_steps, u.status_text, u.status_until,
+              l.user_id, l.lat, l.lng, l.accuracy, l.speed, l.heading, l.battery, l.updated_at,
+              l.activity, l.is_charging, l.steps_today, l.anchor_since,
+              theirs.mode AS their_mode, theirs.frozen_lat, theirs.frozen_lng, theirs.frozen_at,
+              mine.mode AS my_mode
        FROM friendships f
        JOIN users u ON u.id = CASE WHEN f.requester_id = $1 THEN f.addressee_id ELSE f.requester_id END
        LEFT JOIN locations l ON l.user_id = u.id
+       LEFT JOIN location_sharing theirs ON theirs.owner_id = u.id AND theirs.friend_id = $1
+       LEFT JOIN location_sharing mine ON mine.owner_id = $1 AND mine.friend_id = u.id
        WHERE f.status = 'accepted' AND (f.requester_id = $1 OR f.addressee_id = $1)
        ORDER BY u.name`,
-      [req.auth.userId],
+      [me],
     );
     res.json({
       friends: rows.map((r) => ({
         ...publicUser(r),
         friendsSince: r.accepted_at,
-        location: r.user_id ? serializeLocation(r) : null,
+        location: viewOf({ mode: r.their_mode ?? r.owner_default, frozen: r, owner: r, loc: r.user_id ? { ...r, user_id: r.user_id } : null }),
+        // How you appear to this friend ("default" = your general setting).
+        sharing: r.my_mode ?? 'default',
       })),
     });
+  }),
+);
+
+// Choose how you appear to one friend: precise | blurred | frozen (they keep the point from now) | hidden | default.
+router.put(
+  '/:userId/sharing',
+  route(async (req, res) => {
+    const friend = idParam(req.params.userId, 'Friend');
+    const { mode } = parse(z.object({ mode: z.enum([...MODES, 'default']) }), req.body);
+    const me = req.auth.userId;
+    const ok = await one(
+      `SELECT 1 FROM friendships WHERE status = 'accepted'
+         AND LEAST(requester_id, addressee_id) = LEAST($1::uuid, $2::uuid) AND GREATEST(requester_id, addressee_id) = GREATEST($1::uuid, $2::uuid)`,
+      [me, friend],
+    );
+    if (!ok) throw notFound('Friend');
+    if (mode === 'default') {
+      await query('DELETE FROM location_sharing WHERE owner_id = $1 AND friend_id = $2', [me, friend]);
+    } else {
+      const loc = mode === 'frozen' ? await one('SELECT lat, lng FROM locations WHERE user_id = $1', [me]) : null;
+      await query(
+        `INSERT INTO location_sharing (owner_id, friend_id, mode, frozen_lat, frozen_lng, frozen_at)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (owner_id, friend_id) DO UPDATE SET mode = EXCLUDED.mode, frozen_lat = EXCLUDED.frozen_lat,
+           frozen_lng = EXCLUDED.frozen_lng, frozen_at = EXCLUDED.frozen_at`,
+        [me, friend, mode, loc?.lat ?? null, loc?.lng ?? null, loc ? new Date() : null],
+      );
+    }
+    // The friend's map follows at once: they get the new view (or none).
+    const view = (await viewsForFriends(me)).find((v) => v.friendId === friend)?.view ?? null;
+    emitToUsers([friend], view ? 'friend:location' : 'friend:location_hidden', view ?? { userId: me });
+    res.json({ userId: friend, mode });
   }),
 );
 

@@ -6,6 +6,7 @@ import { many, one } from '../db.js';
 import { conflict, parse, route, unauthorized } from '../lib/http.js';
 import { refreshPlan } from '../lib/plans.js';
 import { emitToUsers, friendIds } from '../lib/social.js';
+import { MODES, STILL_RADIUS_M, distanceM, viewsForFriends } from '../lib/privacy.js';
 import { sessionOnly } from '../middleware/auth.js';
 
 const router = Router();
@@ -39,6 +40,9 @@ export function serializeLocation(row) {
     speed: row.speed,
     heading: row.heading,
     battery: row.battery,
+    activity: row.activity ?? null,
+    isCharging: row.is_charging ?? null,
+    stepsToday: row.steps_today ?? null,
     updatedAt: row.updated_at,
   };
 }
@@ -121,6 +125,46 @@ router.put(
   }),
 );
 
+// How you appear to friends by default, and which sensitive extras (movement, charging, steps) they may see.
+const sharingSchema = z
+  .object({ defaultMode: z.enum(MODES), activity: z.boolean(), steps: z.boolean() })
+  .partial()
+  .strict();
+
+router.get(
+  '/sharing',
+  route(async (req, res) => {
+    const u = await one('SELECT share_mode, share_activity, share_steps, ghost_mode FROM users WHERE id = $1', [req.auth.userId]);
+    res.json({ defaultMode: u.share_mode, activity: u.share_activity, steps: u.share_steps, ghostMode: u.ghost_mode });
+  }),
+);
+
+router.put(
+  '/sharing',
+  route(async (req, res) => {
+    const input = parse(sharingSchema, req.body);
+    const u = await one(
+      `UPDATE users SET share_mode = COALESCE($2, share_mode), share_activity = COALESCE($3, share_activity),
+         share_steps = COALESCE($4, share_steps) WHERE id = $1 RETURNING share_mode, share_activity, share_steps, ghost_mode`,
+      [req.auth.userId, input.defaultMode ?? null, input.activity ?? null, input.steps ?? null],
+    );
+    res.json({ defaultMode: u.share_mode, activity: u.share_activity, steps: u.share_steps, ghostMode: u.ghost_mode });
+  }),
+);
+
+// A short status ("Coffee"), shown on the map next to the avatar; it ends by itself (hours, default 8, up to 48).
+router.put(
+  '/status',
+  route(async (req, res) => {
+    const { text, hours } = parse(z.object({ text: z.string().trim().max(60), hours: z.number().int().min(1).max(48).default(8) }), req.body);
+    await one(
+      'UPDATE users SET status_text = $2, status_until = $3 WHERE id = $1 RETURNING id',
+      [req.auth.userId, text || null, text ? new Date(Date.now() + hours * 3_600_000) : null],
+    );
+    res.json({ text: text || null });
+  }),
+);
+
 export const locationSchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
@@ -128,6 +172,10 @@ export const locationSchema = z.object({
   speed: z.number().min(0).max(1_000).nullish(),
   heading: z.number().min(0).max(360).nullish(),
   battery: z.number().int().min(0).max(100).nullish(),
+  // Sensitive extras: stored always, shown to friends only when the owner turned the matching switch on.
+  activity: z.enum(['still', 'walking', 'vehicle', 'sleeping']).nullish(),
+  isCharging: z.boolean().nullish(),
+  stepsToday: z.number().int().min(0).max(1_000_000).nullish(),
 });
 
 /**
@@ -139,18 +187,30 @@ export async function updateLocation(userId, input) {
   const user = await one('SELECT ghost_mode FROM users WHERE id = $1', [userId]);
   if (!user || user.ghost_mode) return { shared: false, location: null };
 
+  // "Here for N minutes": the anchor moves only when the person leaves a small circle around it.
+  const before = await one('SELECT anchor_lat, anchor_lng, anchor_since FROM locations WHERE user_id = $1', [userId]);
+  const stays = before?.anchor_since && distanceM(before.anchor_lat, before.anchor_lng, input.lat, input.lng) <= STILL_RADIUS_M;
+  const anchor = stays ? [before.anchor_lat, before.anchor_lng, before.anchor_since] : [input.lat, input.lng, new Date()];
+
   const row = await one(
-    `INSERT INTO locations (user_id, lat, lng, accuracy, speed, heading, battery, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+    `INSERT INTO locations (user_id, lat, lng, accuracy, speed, heading, battery, activity, is_charging, steps_today,
+                            anchor_lat, anchor_lng, anchor_since, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
      ON CONFLICT (user_id) DO UPDATE SET
        lat = EXCLUDED.lat, lng = EXCLUDED.lng, accuracy = EXCLUDED.accuracy, speed = EXCLUDED.speed,
-       heading = EXCLUDED.heading, battery = EXCLUDED.battery, updated_at = NOW()
+       heading = EXCLUDED.heading, battery = EXCLUDED.battery, activity = EXCLUDED.activity,
+       is_charging = EXCLUDED.is_charging, steps_today = EXCLUDED.steps_today,
+       anchor_lat = EXCLUDED.anchor_lat, anchor_lng = EXCLUDED.anchor_lng, anchor_since = EXCLUDED.anchor_since,
+       updated_at = NOW()
      RETURNING *`,
-    [userId, input.lat, input.lng, input.accuracy ?? null, input.speed ?? null, input.heading ?? null, input.battery ?? null],
+    [userId, input.lat, input.lng, input.accuracy ?? null, input.speed ?? null, input.heading ?? null, input.battery ?? null,
+      input.activity ?? null, input.isCharging ?? null, input.stepsToday ?? null, ...anchor],
   );
-  const location = serializeLocation(row);
-  emitToUsers(await friendIds(userId), 'friend:location', location);
-  return { shared: true, location };
+  // Each friend gets their own view of the point (precise, blurred, frozen or nothing).
+  for (const { friendId, view } of await viewsForFriends(userId)) {
+    if (view) emitToUsers([friendId], 'friend:location', view);
+  }
+  return { shared: true, location: serializeLocation(row) };
 }
 
 router.put(
