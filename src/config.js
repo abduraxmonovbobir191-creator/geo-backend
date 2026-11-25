@@ -26,6 +26,26 @@ export const config = {
   // covers one country, backed by the public OpenStreetMap server for the rest of the world.
   geocoderFallbackUrl: env.GEOCODER_FALLBACK_URL || null,
   geocoderUserAgent: env.GEOCODER_USER_AGENT || 'NexMap/0.1 (self-hosted)',
+  // Nex ID (OIDC + PKCE): the only sign-in of the Nex ecosystem. The secret stays on this server.
+  nexid: {
+    issuer: (env.NEXID_ISSUER || '').replace(/\/+$/, ''),
+    clientId: env.NEXID_CLIENT_ID || '',
+    clientSecret: env.NEXID_CLIENT_SECRET || '',
+    redirectUris: (env.NEXID_REDIRECT_URIS || 'nexmap://auth').split(',').map((s) => s.trim()).filter(Boolean),
+    postLogoutUri: env.NEXID_POST_LOGOUT_URI || 'nexmap://logout',
+    planCacheMinutes: Number(env.PLAN_CACHE_MINUTES || 30),
+    premiumUrl: env.PREMIUM_URL || 'https://id.nexecos.com/account/premium',
+  },
+  // Old e-mail + password accounts: on in development and tests, off in production unless asked for.
+  legacyPasswordLogin: (env.LEGACY_PASSWORD_LOGIN ?? (isProduction ? '0' : '1')) === '1',
+  // Other Nex products (Nexly, Nexgram, Nex ID) call /internal/v1 with `X-Service-Key` + `X-Nexid-Sub`.
+  // SERVICE_KEYS=nexly:<key>,nexgramm:<key>  (never exposed publicly, never the user's token).
+  serviceKeys: Object.fromEntries(
+    (env.SERVICE_KEYS || '')
+      .split(',')
+      .map((p) => p.trim().split(':'))
+      .filter((p) => p.length === 2 && p[0] && p[1]),
+  ),
   rateLimit: {
     windowMs: Number(env.RATE_LIMIT_WINDOW_MS || 60_000),
     // Requests per window for API-key clients (third-party developers).

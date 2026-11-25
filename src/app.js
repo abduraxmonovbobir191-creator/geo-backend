@@ -17,6 +17,7 @@ import activityRoutes, { listUserActivities } from './routes/activities.js';
 import placeRoutes from './routes/places.js';
 import geocodeRoutes from './routes/geocode.js';
 import messageRoutes from './routes/messages.js';
+import internalRoutes from './routes/internal.js';
 import apiKeyRoutes from './routes/apiKeys.js';
 
 function apiKeyFrom(req) {
@@ -96,6 +97,7 @@ export function createApp() {
   v1.use('/api-keys', apiKeyRoutes);
 
   app.use('/v1', v1);
+  app.use('/internal/v1', internalRoutes);
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;

@@ -2,11 +2,18 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { one } from '../db.js';
-import { conflict, parse, route, unauthorized } from '../lib/http.js';
+import { config } from '../config.js';
+import { HttpError, conflict, parse, route, unauthorized } from '../lib/http.js';
 import { signUserToken } from '../lib/tokens.js';
+import nexidAuth from './nexidAuth.js';
 import { serializeMe } from './me.js';
 
 const router = Router();
+
+// Old e-mail + password accounts only (LEGACY_PASSWORD_LOGIN=1). New sign-ins go through Nex ID.
+router.use(['/register', '/login'], (_req, _res, next) =>
+  config.legacyPasswordLogin ? next() : next(new HttpError(410, 'use_nexid', 'Sign in with Nex ID')),
+);
 
 const username = z
   .string()
@@ -62,11 +69,13 @@ router.post(
     const user = await one('SELECT * FROM users WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)', [
       login,
     ]);
-    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    if (!user || !user.password_hash || !(await bcrypt.compare(password, user.password_hash))) {
       throw unauthorized('Wrong login or password');
     }
     res.json({ token: signUserToken(user.id), user: serializeMe(user) });
   }),
 );
+
+router.use(nexidAuth);
 
 export default router;

@@ -29,6 +29,22 @@ Testlar alohida bazada ishlaydi (`nexmap_test`, yoki `TEST_DATABASE_URL`):
 npm test
 ```
 
+## Nex ekotizimi (Nex ID, Nexly, Nexgram)
+
+Nex Map bitta ekotizimning qismi: **hisob bitta, Nex ID** (`sub` bo'yicha), Nexly va Nexgram bilan bir xil.
+
+- **Kirish faqat Nex ID orqali** (OIDC + PKCE): ilova `nexmap://auth` ga qaytgan kodni `POST /v1/auth/nexid`
+  `{code, codeVerifier, redirectUri}` ga yuboradi, javobda `token` va `logoutUrl`. `POST /v1/auth/logout` Nex ID
+  grantini bekor qiladi. Eski parol bilan kirish faqat `LEGACY_PASSWORD_LOGIN=1` bo'lsa ishlaydi (productionda o'chiq, 410 `use_nexid`).
+- **Nex Premium** Nex ID'da sotiladi, `GET /v1/me` da `plan`, `perks`, `premiumUrl` keladi (kesh `PLAN_CACHE_MINUTES`,
+  Nex ID ishlamasa eski tarif qoladi). Imkoniyatlar `perks` kalitiga qarab ochiladi (`nexmap.api_keys`: 50 ta API kalit).
+- **Nexly / Nexgram uchun xizmat API** `/internal/v1` (`X-Service-Key` + `X-Nexid-Sub`, `SERVICE_KEYS=nexly:<kalit>,nexgramm:<kalit>`,
+  nginx'da ochiq qilinmaydi, foydalanuvchi tokeni bu yerda ishlamaydi):
+  `GET /geocode/search|reverse` (post joyi uchun), `POST /users/resolve` (qaysi Nex ID'lar Nex Map'da),
+  `GET /users/me/profile` va `/users/me/activities` (profil kartasi, faqat ochiq mashg'ulotlar),
+  `GET /activities/{id}/card` (postga havola kartasi), `POST /friends/sync` (o'zaro obunachilar Nex Map do'sti bo'ladi).
+  Jonli lokatsiya, ghost rejim va do'stlarga mo'ljallangan mashg'ulotlar bu yerdan **hech qachon** chiqmaydi.
+
 ## Imkoniyatlar
 
 | Bo'lim | Endpointlar |

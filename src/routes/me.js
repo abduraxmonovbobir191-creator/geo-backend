@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { config } from '../config.js';
 import { many, one } from '../db.js';
 import { conflict, parse, route, unauthorized } from '../lib/http.js';
+import { refreshPlan } from '../lib/plans.js';
 import { emitToUsers, friendIds } from '../lib/social.js';
 import { sessionOnly } from '../middleware/auth.js';
 
@@ -18,6 +20,11 @@ export function serializeMe(row) {
     avatarUrl: row.avatar_url,
     ghostMode: row.ghost_mode,
     createdAt: row.created_at,
+    // Nex ID account (shared with Nexly and Nexgram) and Nex Premium.
+    nexid: row.nexid_sub ? { verificationLevel: row.verification_level } : null,
+    plan: row.plan,
+    perks: row.perks,
+    premiumUrl: config.nexid.premiumUrl,
   };
 }
 
@@ -37,7 +44,7 @@ export function serializeLocation(row) {
 router.get(
   '/',
   route(async (req, res) => {
-    const user = await one('SELECT * FROM users WHERE id = $1', [req.auth.userId]);
+    const user = await refreshPlan(await one('SELECT * FROM users WHERE id = $1', [req.auth.userId]));
     res.json(serializeMe(user));
   }),
 );
@@ -101,7 +108,7 @@ router.put(
   route(async (req, res) => {
     const input = parse(passwordSchema, req.body);
     const user = await one('SELECT password_hash FROM users WHERE id = $1', [req.auth.userId]);
-    if (!(await bcrypt.compare(input.currentPassword, user.password_hash))) {
+    if (!user.password_hash || !(await bcrypt.compare(input.currentPassword, user.password_hash))) {
       throw unauthorized('Current password is wrong');
     }
     await one('UPDATE users SET password_hash = $2 WHERE id = $1', [

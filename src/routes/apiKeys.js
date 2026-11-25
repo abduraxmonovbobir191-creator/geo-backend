@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { many, one } from '../db.js';
 import { badRequest, idParam, notFound, parse, route } from '../lib/http.js';
+import { maxApiKeys } from '../lib/plans.js';
 import { generateApiKey } from '../lib/tokens.js';
 import { sessionOnly } from '../middleware/auth.js';
 
@@ -10,7 +11,6 @@ import { sessionOnly } from '../middleware/auth.js';
 const router = Router();
 router.use(sessionOnly);
 
-const MAX_ACTIVE_KEYS = 10;
 
 function serializeKey(r) {
   return {
@@ -51,7 +51,8 @@ router.post(
       'SELECT COUNT(*) AS count FROM api_keys WHERE user_id = $1 AND revoked_at IS NULL',
       [req.auth.userId],
     );
-    if (count >= MAX_ACTIVE_KEYS) throw badRequest(`You can have at most ${MAX_ACTIVE_KEYS} active API keys`);
+    const limit = maxApiKeys(await one('SELECT perks FROM users WHERE id = $1', [req.auth.userId]));
+    if (count >= limit) throw badRequest(`You can have at most ${limit} active API keys`);
     const { key, prefix, hash } = generateApiKey();
     const row = await one(
       `INSERT INTO api_keys (user_id, name, prefix, key_hash, scopes)
