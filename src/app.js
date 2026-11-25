@@ -18,6 +18,7 @@ import placeRoutes from './routes/places.js';
 import geocodeRoutes from './routes/geocode.js';
 import messageRoutes from './routes/messages.js';
 import internalRoutes from './routes/internal.js';
+import shopRoutes from './routes/shop.js';
 import apiKeyRoutes from './routes/apiKeys.js';
 
 function apiKeyFrom(req) {
@@ -95,6 +96,7 @@ export function createApp() {
   v1.use('/geocode', geocodeRoutes);
   v1.use('/messages', messageRoutes);
   v1.use('/api-keys', apiKeyRoutes);
+  v1.use('/shop', shopRoutes);
 
   app.use('/v1', v1);
   app.use('/internal/v1', internalRoutes);

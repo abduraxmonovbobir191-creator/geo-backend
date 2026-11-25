@@ -3,13 +3,21 @@
 import { config } from '../config.js';
 import { one } from '../db.js';
 import { fetchPlan } from './nexid.js';
+import { entitlementsOf } from './shop.js';
 
 export const has = (user, perk) => Array.isArray(user?.perks) && user.perks.includes(perk);
 
 // nexmap.api_keys: more developer API keys.
 export const maxApiKeys = (user) => (has(user, 'nexmap.api_keys') ? 50 : 10);
 
-export async function refreshPlan(user, { force = false } = {}) {
+// Adds `entitlements`: Nex ID perks plus what was bought in Nex Map (works only here).
+export async function refreshPlan(user, opts) {
+  const fresh = await refreshPerks(user, opts);
+  if (fresh) fresh.entitlements = await entitlementsOf(fresh);
+  return fresh;
+}
+
+async function refreshPerks(user, { force = false } = {}) {
   if (!user?.nexid_sub) return user;
   const fresh = user.plan_checked_at && Date.now() - new Date(user.plan_checked_at).getTime() < config.nexid.planCacheMinutes * 60_000;
   if (fresh && !force) return user;

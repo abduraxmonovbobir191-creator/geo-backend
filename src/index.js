@@ -4,6 +4,7 @@ import { createApp } from './app.js';
 import { migrate } from './migrate.js';
 import { attachRealtime } from './realtime.js';
 import { pool } from './db.js';
+import { renewDue } from './lib/shop.js';
 
 await migrate();
 
@@ -13,6 +14,10 @@ const io = attachRealtime(server);
 server.listen(config.port, () => {
   console.log(`Nex Map API listening on http://localhost:${config.port} (docs at /docs)`);
 });
+
+// Subscriptions renew every 10 minutes (one coin charge per due period; the wallet ref makes a retry safe).
+const sweep = setInterval(() => renewDue().catch((e) => console.error('renew failed:', e.message)), 600_000);
+sweep.unref();
 
 function shutdown() {
   io.close();

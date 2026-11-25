@@ -24,6 +24,8 @@ export function serializeMe(row) {
     nexid: row.nexid_sub ? { verificationLevel: row.verification_level } : null,
     plan: row.plan,
     perks: row.perks,
+    // Nex ID perks plus Nex Map purchases: what this account can use in Nex Map.
+    entitlements: row.entitlements ?? row.perks,
     premiumUrl: config.nexid.premiumUrl,
   };
 }

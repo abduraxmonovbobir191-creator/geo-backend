@@ -5,6 +5,8 @@ import { config } from '../config.js';
 import { many, one } from '../db.js';
 import { HttpError, idParam, notFound, parse, route } from '../lib/http.js';
 import { publicUser } from '../lib/social.js';
+import { buy, shopFor } from '../lib/shop.js';
+import { buySchema } from './shop.js';
 import geocodeRoutes from './geocode.js';
 
 // Service API for the other Nex products (Nexly, Nexgram, Nex ID): one ecosystem, one account (the Nex ID `sub`).
@@ -150,6 +152,19 @@ router.post(
       }
     }
     res.json({ added });
+  }),
+);
+
+// Nexly and Nexgram show Nex Map's subscription and items with a buy button (1-2 taps, the person confirms in that app).
+// The coins still come from the one Nex ID wallet and what is bought works only in Nex Map; `source` records the app.
+router.get('/shop', route(async (req, res) => res.json(await shopFor(await actingUser(req)))));
+
+router.post(
+  '/shop/buy',
+  route(async (req, res) => {
+    const user = await actingUser(req);
+    const p = await buy(user, { ...parse(buySchema, req.body), source: req.service });
+    res.status(201).json({ purchase: { id: p.id, sku: p.sku, status: p.status, renewsAt: p.renews_at }, ...(await shopFor(user)) });
   }),
 );
 

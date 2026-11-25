@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { many, one } from '../db.js';
 import { badRequest, idParam, notFound, parse, route } from '../lib/http.js';
+import { entitlementsOf } from '../lib/shop.js';
 import { maxApiKeys } from '../lib/plans.js';
 import { generateApiKey } from '../lib/tokens.js';
 import { sessionOnly } from '../middleware/auth.js';
@@ -51,7 +52,7 @@ router.post(
       'SELECT COUNT(*) AS count FROM api_keys WHERE user_id = $1 AND revoked_at IS NULL',
       [req.auth.userId],
     );
-    const limit = maxApiKeys(await one('SELECT perks FROM users WHERE id = $1', [req.auth.userId]));
+    const limit = maxApiKeys({ perks: await entitlementsOf(await one('SELECT * FROM users WHERE id = $1', [req.auth.userId])) });
     if (count >= limit) throw badRequest(`You can have at most ${limit} active API keys`);
     const { key, prefix, hash } = generateApiKey();
     const row = await one(
