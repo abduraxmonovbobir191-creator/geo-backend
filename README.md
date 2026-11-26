@@ -81,6 +81,17 @@ Nex Map hech narsa saqlamaydi, to'lov Nex ID `charge` bilan yechiladi (`ref` bil
 - Xarita ko'rinishi bizniki: `deploy/tileserver/nex-style.mjs` (yorug' va qorong'i, 3D binolar z14+, ochilishda 45° qiyalik).
 - Butun dunyo marshrut va qidiruv: `deploy/planet/README.md` (soatbay katta serverda quriladi, asosiy serverga ko'chiriladi).
 
+## Jonli belgilar, kupon, Bump (Waze / Snap Map / Blink)
+
+- **Jonli belgilar:** `POST /v1/alerts {kind, lat, lng, note}` (tirbandlik, YTH, ta'mir, kamera, patrul, navbat, yopiq yo'l, xavf, chuqur), `GET /v1/alerts/nearby?lat&lng&radius`,
+  `POST /v1/alerts/{id}/confirm {still}`. Yaqin atrofdagi (150 m) bir xil belgi qayta qo'shilmaydi, tasdiqlanadi. Belgi o'zi tugaydi, tasdiqlansa uzayadi,
+  3 ta "yo'q" ovozi uni olib tashlaydi. Ball: belgi +10, tasdiq +2, tasdiqlangan belgi egasiga +1 (xato bo'lsa -1); daraja `GET /v1/me` da (`points`, `level`).
+  Kamera va patrul qonuniy bo'lmagan mamlakatda `ALERT_DISABLED_KINDS=camera,police` bilan o'chiriladi.
+- **Kupon:** egasi `POST /v1/business/offers {placeId, title, leadFee, quota, days}`, odam `POST /v1/offers/{id}/claim` (bittadan), kassada egasi
+  `POST /v1/business/redeem {code}`: har bir ishlatilgan kupon uchun `leadFee` Stars egasidan Nex ID hamyonida bir marta yechiladi (Stars yetmasa 402, kupon amalda qoladi).
+- **Footprints:** `GET /v1/me/footprints` (~1 km katak, faqat o'zingizga). **Bump:** ikki do'st bir-biriga aniq joyini ko'rsatib 50 m ichida tursa `friend:bump` (30 daqiqada bir marta).
+  **Stiker:** `POST /v1/friends/{id}/poke {emoji, count}` (`friend:poke`).
+
 ## Imkoniyatlar
 
 | Bo'lim | Endpointlar |

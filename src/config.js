@@ -48,6 +48,8 @@ export const config = {
   ),
   // Which services may open a Nex Map session for a person they already signed in (Nexly's Nex Map tab). Never the user's token.
   sessionServices: (env.SESSION_SERVICES || 'nexly').split(',').map((s) => s.trim()).filter(Boolean),
+  // Alert kinds this server does not allow (e.g. camera,police where such posts are banned by law)
+  alertDisabledKinds: (env.ALERT_DISABLED_KINDS || '').split(',').map((s) => s.trim()).filter(Boolean),
   // Own Valhalla routing server (deploy/planet). Without it /v1/route answers 503 routing_unavailable.
   routingUrl: (env.ROUTING_URL || '').replace(/\/+$/, ''),
   rateLimit: {

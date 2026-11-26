@@ -2,11 +2,13 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { config } from '../config.js';
-import { many, one } from '../db.js';
+import { many, one, query } from '../db.js';
 import { conflict, parse, route, unauthorized } from '../lib/http.js';
 import { refreshPlan } from '../lib/plans.js';
 import { emitToUsers, friendIds } from '../lib/social.js';
+import { levelOf } from './alerts.js';
 import { MODES, STILL_RADIUS_M, distanceM, viewsForFriends } from '../lib/privacy.js';
+import { boundingBox } from '../lib/geo.js';
 import { sessionOnly } from '../middleware/auth.js';
 
 const router = Router();
@@ -21,6 +23,8 @@ export function serializeMe(row) {
     avatarUrl: row.avatar_url,
     ghostMode: row.ghost_mode,
     createdAt: row.created_at,
+    points: row.points ?? 0,
+    level: levelOf(row.points ?? 0),
     // Nex ID account (shared with Nexly and Nexgram) and Nex Premium.
     nexid: row.nexid_sub ? { verificationLevel: row.verification_level } : null,
     plan: row.plan,
@@ -206,12 +210,50 @@ export async function updateLocation(userId, input) {
     [userId, input.lat, input.lng, input.accuracy ?? null, input.speed ?? null, input.heading ?? null, input.battery ?? null,
       input.activity ?? null, input.isCharging ?? null, input.stepsToday ?? null, ...anchor],
   );
+  // Footprints: the ~1 km cell is added to the person's own map (never shown to anyone else).
+  query('INSERT INTO footprints (user_id, cell) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, `${Math.floor(input.lat / 0.01)}:${Math.floor(input.lng / 0.01)}`]).catch(() => {});
+  meetFriends(userId, input).catch(() => {});
   // Each friend gets their own view of the point (precise, blurred, frozen or nothing).
   for (const { friendId, view } of await viewsForFriends(userId)) {
     if (view) emitToUsers([friendId], 'friend:location', view);
   }
   return { shared: true, location: serializeLocation(row) };
 }
+
+// Bump: two friends who both show each other their exact place and stand within 50 m meet. One event per pair per 30 minutes.
+async function meetFriends(userId, input) {
+  const box = boundingBox(input.lat, input.lng, 60);
+  const rows = await many(
+    `SELECT l.user_id, l.lat, l.lng FROM locations l
+     JOIN friendships f ON f.status = 'accepted' AND ((f.requester_id = $1 AND f.addressee_id = l.user_id) OR (f.addressee_id = $1 AND f.requester_id = l.user_id))
+     JOIN users u ON u.id = l.user_id AND NOT u.ghost_mode
+     WHERE l.updated_at > NOW() - INTERVAL '5 minutes' AND l.lat BETWEEN $2 AND $3 AND l.lng BETWEEN $4 AND $5`,
+    [userId, box.minLat, box.maxLat, box.minLng, box.maxLng],
+  );
+  for (const r of rows) {
+    if (distanceM(input.lat, input.lng, r.lat, r.lng) > 50) continue;
+    const [a, b] = userId < r.user_id ? [userId, r.user_id] : [r.user_id, userId];
+    // only when each of them shows the exact place to the other (their own privacy choice decides)
+    const [mine, theirs] = await Promise.all([viewsForFriends(userId), viewsForFriends(r.user_id)]);
+    const seeMe = mine.find((v) => v.friendId === r.user_id)?.view;
+    const seeThem = theirs.find((v) => v.friendId === userId)?.view;
+    if (!seeMe || seeMe.mode !== 'precise' || !seeThem || seeThem.mode !== 'precise') continue;
+    const fresh = await one(
+      `INSERT INTO bumps (a, b) VALUES ($1, $2) ON CONFLICT (a, b) DO UPDATE SET at = NOW() WHERE bumps.at < NOW() - INTERVAL '30 minutes' RETURNING a`,
+      [a, b],
+    );
+    if (fresh) emitToUsers([userId, r.user_id], 'friend:bump', { users: [userId, r.user_id] });
+  }
+}
+
+router.get(
+  '/footprints',
+  route(async (req, res) => {
+    const rows = await many('SELECT cell, first_at FROM footprints WHERE user_id = $1 ORDER BY first_at DESC LIMIT 5000', [req.auth.userId]);
+    // each cell is 0.01 degrees: the client draws the squares it has uncovered
+    res.json({ count: rows.length, size: 0.01, cells: rows.map((r) => { const [la, ln] = r.cell.split(':').map(Number); return { lat: la * 0.01, lng: ln * 0.01, at: r.first_at }; }) });
+  }),
+);
 
 router.put(
   '/location',

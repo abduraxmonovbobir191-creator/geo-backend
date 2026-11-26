@@ -20,6 +20,8 @@ import messageRoutes from './routes/messages.js';
 import internalRoutes from './routes/internal.js';
 import routeRoutes from './routes/route.js';
 import businessRoutes, { placeExtras } from './routes/business.js';
+import { businessOffers, offerRoutes, publicOffers } from './routes/offers.js';
+import alertRoutes from './routes/alerts.js';
 import shopRoutes from './routes/shop.js';
 import apiKeyRoutes from './routes/apiKeys.js';
 
@@ -95,13 +97,17 @@ export function createApp() {
   v1.use('/friends', friendRoutes);
   v1.use('/activities', activityRoutes);
   v1.use('/places', placeExtras);
+  v1.use('/places', publicOffers);
   v1.use('/places', placeRoutes);
   v1.use('/business', businessRoutes);
+  v1.use('/business', businessOffers);
+  v1.use('/offers', offerRoutes);
   v1.use('/route', routeRoutes);
   v1.use('/geocode', geocodeRoutes);
   v1.use('/messages', messageRoutes);
   v1.use('/api-keys', apiKeyRoutes);
   v1.use('/shop', shopRoutes);
+  v1.use('/alerts', alertRoutes);
 
   app.use('/v1', v1);
   app.use('/internal/v1', internalRoutes);

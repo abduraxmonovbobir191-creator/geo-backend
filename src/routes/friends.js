@@ -40,6 +40,27 @@ router.get(
   }),
 );
 
+// Sticker bomb: an emoji flies onto a friend's screen (1 to 50 at once); a burst is limited so nobody is flooded.
+const pokes = new Map();
+router.post(
+  '/:userId/poke',
+  route(async (req, res) => {
+    const friend = idParam(req.params.userId, 'Friend');
+    const { emoji, count } = parse(z.object({ emoji: z.string().trim().min(1).max(8), count: z.number().int().min(1).max(50).default(1) }), req.body);
+    const ok = await one(
+      `SELECT 1 FROM friendships WHERE status = 'accepted' AND LEAST(requester_id, addressee_id) = LEAST($1::uuid, $2::uuid) AND GREATEST(requester_id, addressee_id) = GREATEST($1::uuid, $2::uuid)`,
+      [req.auth.userId, friend],
+    );
+    if (!ok) throw notFound('Friend');
+    const now = Date.now();
+    const recent = (pokes.get(req.auth.userId) ?? []).filter((t) => now - t < 60_000);
+    if (recent.length >= 20) throw new HttpError(429, 'rate_limited', 'Too many stickers, slow down');
+    pokes.set(req.auth.userId, [...recent, now]);
+    emitToUsers([friend], 'friend:poke', { from: req.auth.userId, emoji, count });
+    res.status(204).end();
+  }),
+);
+
 // Choose how you appear to one friend: precise | blurred | frozen (they keep the point from now) | hidden | default.
 router.put(
   '/:userId/sharing',
