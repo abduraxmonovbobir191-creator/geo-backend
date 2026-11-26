@@ -5,6 +5,8 @@ import { config } from '../config.js';
 import { many, one } from '../db.js';
 import { HttpError, idParam, notFound, parse, route } from '../lib/http.js';
 import { publicUser } from '../lib/social.js';
+import { signInWithClaims } from './nexidAuth.js';
+import { signUserToken } from '../lib/tokens.js';
 import { buy, shopFor } from '../lib/shop.js';
 import { buySchema } from './shop.js';
 import geocodeRoutes from './geocode.js';
@@ -42,6 +44,32 @@ async function actingUser(req) {
 
 // Address search for a post's place tag (Nexly posts.place) or a Nexgram location: same geocoder as the app.
 router.use('/geocode', geocodeRoutes);
+
+// Single sign-on inside Nexly: Nexly already signed the person in at Nex ID, so its server asks for a Nex Map token for that
+// `sub` (and creates the Nex Map account the first time). The app then talks to Nex Map directly with this token.
+// Only the services in SESSION_SERVICES may do this; the person's own Nexly token never reaches this server.
+router.post(
+  '/session',
+  route(async (req, res) => {
+    if (!config.sessionServices.includes(req.service)) throw new HttpError(403, 'forbidden', 'This service may not open sessions');
+    const b = parse(
+      z.object({
+        sub: z.string().min(1).max(64),
+        name: z.string().max(80).default(''),
+        username: z.string().max(30).nullish(),
+        picture: z.string().url().max(500).nullish(),
+        verificationLevel: z.number().int().min(0).max(3).default(0),
+        telegramId: z.number().int().positive().nullish(),
+      }),
+      req.body,
+    );
+    const user = await signInWithClaims({
+      claims: { sub: b.sub, name: b.name, username: b.username ?? null, picture: b.picture?.startsWith('https://') ? b.picture : null, verificationLevel: b.verificationLevel, telegramId: b.telegramId ?? null },
+      refreshToken: null,
+    });
+    res.json({ token: signUserToken(user.id), userId: user.id });
+  }),
+);
 
 // Which of these Nex IDs already use Nex Map (for "people you know on Nex Map").
 router.post(
