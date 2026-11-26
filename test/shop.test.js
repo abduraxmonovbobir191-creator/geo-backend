@@ -7,7 +7,7 @@ process.env.NEXID_CLIENT_SECRET = 'secret';
 process.env.SERVICE_KEYS = 'nexly:nexly-key';
 const { app, pool, request, resetDatabase } = await import('./helpers.js');
 const { transport } = await import('../src/lib/nexid.js');
-const { renewDue } = await import('../src/lib/shop.js');
+const { endExpired, endingSoon } = await import('../src/lib/shop.js');
 
 let coins = 1000;
 const charged = new Map(); // ref -> amount (Nex ID dedupes by ref)
@@ -77,27 +77,34 @@ describe('Nex Map shop', () => {
     assert.equal(res.status, 403);
   });
 
-  it('subscribes, cancels with access to the end, then renews or ends', async () => {
-    assert.equal((await request(app).post('/v1/shop/buy').set(auth).send({ sku: 'plus', price: 300, key: 'plus-key-001' })).status, 201);
+  it('sells a 30-day pass: one tap extends it, a retry adds the days once, an expired pass ends and can be bought again', async () => {
+    const days = (p) => Math.round((new Date(p).getTime() - Date.now()) / 86_400_000);
+    const first = await request(app).post('/v1/shop/buy').set(auth).send({ sku: 'plus', price: 300, key: 'plus-key-001' });
+    assert.equal(first.status, 201);
     assert.ok((await request(app).get('/v1/me').set(auth)).body.entitlements.includes('nexmap.plus'));
-    // Renewal takes coins again.
-    await pool.query("UPDATE purchases SET renews_at = NOW() - INTERVAL '1 minute' WHERE sku = 'plus'");
+    assert.equal(days(first.body.purchase.renewsAt), 30);
+    // extend while it runs: the days add up (30 + 30)
     const before = coins;
-    assert.equal(await renewDue(), 1);
+    const second = await request(app).post('/v1/shop/buy').set(auth).send({ sku: 'plus', key: 'plus-key-002' });
+    assert.equal(second.status, 201);
+    assert.equal(days(second.body.purchase.renewsAt), 60);
     assert.equal(coins, before - 300);
-    assert.equal(await renewDue(), 0);
-    // Cancel: still valid until the period ends, then gone.
-    assert.equal((await request(app).post('/v1/shop/subscriptions/plus/cancel').set(auth)).status, 200);
-    assert.ok((await request(app).get('/v1/me').set(auth)).body.entitlements.includes('nexmap.plus'));
+    // the same tap again (a retry): charged once, days added once
+    const retry = await request(app).post('/v1/shop/buy').set(auth).send({ sku: 'plus', key: 'plus-key-002' });
+    assert.equal(retry.status, 201);
+    assert.equal(coins, before - 300);
+    assert.equal(days((await pool.query("SELECT renews_at FROM purchases WHERE sku = 'plus'")).rows[0].renews_at), 60);
+    // nothing renews by itself: when the days are over it ends
+    await pool.query("UPDATE purchases SET renews_at = NOW() + INTERVAL '2 days' WHERE sku = 'plus'");
+    assert.equal((await endingSoon(first.body.purchase.userId ?? (await pool.query('SELECT id FROM users LIMIT 1')).rows[0].id)).length, 1);
     await pool.query("UPDATE purchases SET renews_at = NOW() - INTERVAL '1 minute' WHERE sku = 'plus'");
-    await renewDue();
+    const kept = coins;
+    assert.equal(await endExpired(), 1);
+    assert.equal(coins, kept); // no automatic charge
     assert.ok(!(await request(app).get('/v1/me').set(auth)).body.entitlements.includes('nexmap.plus'));
-    // No coins: a running subscription ends instead of charging.
-    assert.equal((await request(app).post('/v1/shop/buy').set(auth).send({ sku: 'plus', key: 'plus-key-002' })).status, 201);
-    await pool.query("UPDATE purchases SET renews_at = NOW() - INTERVAL '1 minute' WHERE sku = 'plus' AND status = 'active'");
-    coins = 0;
-    await renewDue();
-    assert.ok(!(await request(app).get('/v1/me').set(auth)).body.entitlements.includes('nexmap.plus'));
+    // a new pass after it ended
+    assert.equal((await request(app).post('/v1/shop/buy').set(auth).send({ sku: 'plus', key: 'plus-key-003' })).status, 201);
+    assert.ok((await request(app).get('/v1/me').set(auth)).body.entitlements.includes('nexmap.plus'));
   });
 
   it('lets Nexly sell it with the service key and records where it was bought', async () => {

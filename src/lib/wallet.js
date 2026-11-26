@@ -1,5 +1,5 @@
-// The Nex ID wallet (Nex Coins), the one place money lives. Nex Map never holds or sells coins:
-// people buy coins at Nex ID (`walletUrl`), Nex Map asks Nex ID (server to server, confidential client) to charge.
+// The Nex ID wallet (Stars), the one place money lives. Nex Map never holds or sells Stars:
+// people buy Stars in the App Store / Google Play (or at Nex ID on the web) (`walletUrl`), Nex Map asks Nex ID (server to server, confidential client) to charge.
 // Every call has a `ref`, so a retry never takes money twice. Errors keep Nex ID's codes (insufficient_funds -> 402).
 import { config } from '../config.js';
 import { HttpError } from './http.js';
@@ -25,7 +25,7 @@ async function call(path, body) {
   }
   if (res.status >= 400) {
     const code = String(res.data?.error || res.data?.detail || 'wallet_unavailable');
-    if (code === 'insufficient_funds') throw new HttpError(402, 'insufficient_funds', 'Not enough Nex Coins', { walletUrl: walletUrl() });
+    if (code === 'insufficient_funds') throw new HttpError(402, 'insufficient_funds', 'Not enough Stars', { walletUrl: walletUrl() });
     if (res.status < 500 && [403, 404, 409, 422].includes(res.status)) throw new HttpError(res.status, code, 'The wallet refused this');
     throw new HttpError(503, 'wallet_unavailable', 'The Nex ID wallet is not available');
   }

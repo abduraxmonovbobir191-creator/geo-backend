@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { one } from '../db.js';
 import { parse, route } from '../lib/http.js';
-import { buy, setRenewal, shopFor } from '../lib/shop.js';
+import { buy, shopFor } from '../lib/shop.js';
 import { sessionOnly } from '../middleware/auth.js';
 
-// Nex Map's subscription and purchases. Money lives only at Nex ID (Nex Coins); an API key never spends it.
+// Nex Map's subscription and purchases. Money lives only at Nex ID (Stars); an API key never spends it.
 const router = Router();
 const me = (req) => one('SELECT * FROM users WHERE id = $1', [req.auth.userId]);
 
@@ -27,16 +27,5 @@ router.post(
     res.status(201).json({ purchase: { id: p.id, sku: p.sku, status: p.status, renewsAt: p.renews_at }, ...(await shopFor(user)) });
   }),
 );
-
-for (const [action, renew] of [['cancel', false], ['resume', true]]) {
-  router.post(
-    `/subscriptions/:sku/${action}`,
-    sessionOnly,
-    route(async (req, res) => {
-      await setRenewal(req.auth.userId, req.params.sku, renew);
-      res.json(await shopFor(await me(req)));
-    }),
-  );
-}
 
 export default router;

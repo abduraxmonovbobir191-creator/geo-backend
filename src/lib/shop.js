@@ -1,4 +1,4 @@
-// Nex Map shop: subscription and in-app purchases paid in Nex Coins at Nex ID (src/lib/wallet.js).
+// Nex Map shop: a 30-day pass and in-app purchases paid in Stars at Nex ID (src/lib/wallet.js).
 // What is bought here works only in Nex Map (entitlements below), it is never a Nex ID perk.
 import crypto from 'node:crypto';
 import { many, one, query } from '../db.js';
@@ -37,11 +37,11 @@ export function serializeItem(i, owned) {
 
 export async function shopFor(user) {
   const [items, owned] = await Promise.all([catalog(), myPurchases(user.id)]);
-  let coins = null;
-  if (user.nexid_sub) coins = await wallet.balance(user.nexid_sub).catch(() => null);
+  let stars = null;
+  if (user.nexid_sub) stars = await wallet.balance(user.nexid_sub).catch(() => null);
   return {
     items: items.map((i) => serializeItem(i, owned)),
-    balance: coins?.balance ?? null,
+    balance: stars?.balance ?? null,
     walletUrl: wallet.walletUrl(),
   };
 }
@@ -58,6 +58,8 @@ export async function buy(user, { sku, price, key, source = 'map' }) {
   const again = await one('SELECT * FROM purchases WHERE ref = $1', [ref]);
   if (again) return again; // a retry of a paid purchase
   const owned = (await myPurchases(user.id)).find((p) => p.sku === sku);
+  // A 30-day pass is extended with one tap while it runs (the days add up); an item is bought once.
+  if (owned && item.kind === 'subscription') return extendPass(user, item, owned, ref);
   if (owned) throw new HttpError(409, 'already_owned', 'You already have this');
 
   await wallet.charge(user.nexid_sub, item.price, ref, `Nex Map: ${item.title}`);
@@ -67,53 +69,41 @@ export async function buy(user, { sku, price, key, source = 'map' }) {
       [user.id, sku, item.price, ref, source, item.period_days ? new Date(Date.now() + item.period_days * DAY) : null],
     );
   } catch (err) {
-    // Took the money but could not record it: give it back, never keep coins without the item.
+    // Took the money but could not record it: give it back, never keep Stars without the item.
     await wallet.refund(ref).catch(() => {});
     if (err.code === '23505') throw new HttpError(409, 'already_owned', 'You already have this');
     throw err;
   }
 }
 
-async function ownedSubscription(userId, sku) {
-  const p = await one(
-    `SELECT p.* FROM purchases p JOIN shop_items i ON i.sku = p.sku
-     WHERE p.user_id = $1 AND p.sku = $2 AND i.kind = 'subscription' AND p.status IN ('active', 'canceled')`,
-    [userId, sku],
-  );
-  if (!p) throw notFound('Subscription');
-  return p;
-}
-
-// Cancel keeps the access until the paid period ends; resume (before it ends) turns renewals back on, no new charge.
-export async function setRenewal(userId, sku, renew) {
-  const p = await ownedSubscription(userId, sku);
-  if (renew && !stillValid(p)) throw new HttpError(409, 'subscription_ended', 'Buy it again');
-  return one('UPDATE purchases SET status = $2 WHERE id = $1 RETURNING *', [p.id, renew ? 'active' : 'canceled']);
-}
-
-// Sweep: renew what is due at Nex ID's wallet; a person without coins loses the subscription, nothing else.
-export async function renewDue(batch = 100) {
-  let renewed = 0;
-  const due = await many(
-    `SELECT p.*, i.period_days, i.price AS now_price, i.title, u.nexid_sub
-     FROM purchases p JOIN shop_items i ON i.sku = p.sku JOIN users u ON u.id = p.user_id
-     WHERE p.renews_at <= NOW() AND p.status IN ('active', 'canceled') AND i.kind = 'subscription' LIMIT $1`,
-    [batch],
-  );
-  for (const p of due) {
-    if (p.status === 'canceled' || !p.nexid_sub) {
-      await query("UPDATE purchases SET status = 'ended' WHERE id = $1", [p.id]);
-      continue;
-    }
-    const next = new Date(new Date(p.renews_at).getTime() + p.period_days * DAY);
-    try {
-      await wallet.charge(p.nexid_sub, p.now_price, `nexmap:sub:${p.id}:${next.toISOString().slice(0, 10)}`, `Nex Map: ${p.title}`);
-      await query('UPDATE purchases SET renews_at = $2, price = $3 WHERE id = $1', [p.id, next, p.now_price]);
-      renewed += 1;
-    } catch (err) {
-      // No coins: the subscription ends. Nex ID or wallet down: try again at the next sweep.
-      if (err.code === 'insufficient_funds') await query("UPDATE purchases SET status = 'ended' WHERE id = $1", [p.id]);
-    }
+async function extendPass(user, item, owned, ref) {
+  // the same tap again (a retry): the days were added once, nothing is charged or refunded
+  if (await one('SELECT 1 FROM purchase_extensions WHERE ref = $1', [ref])) return one('SELECT * FROM purchases WHERE id = $1', [owned.id]);
+  await wallet.charge(user.nexid_sub, item.price, ref, `Nex Map: ${item.title}`);
+  try {
+    const base = Math.max(Date.now(), new Date(owned.renews_at).getTime());
+    await query('INSERT INTO purchase_extensions (ref, purchase_id, days) VALUES ($1, $2, $3)', [ref, owned.id, item.period_days]);
+    return await one('UPDATE purchases SET renews_at = $2, status = $3 WHERE id = $1 RETURNING *', [owned.id, new Date(base + item.period_days * DAY), 'active']);
+  } catch (err) {
+    if (err.code === '23505') return one('SELECT * FROM purchases WHERE id = $1', [owned.id]); // a parallel retry already recorded it
+    await wallet.refund(ref).catch(() => {}); // took the Stars but could not record it: give them back
+    throw err;
   }
-  return renewed;
 }
+
+// Sweep: a pass that ran out simply ends. Nothing is charged automatically (store rules); the app reminds the person and one tap extends it.
+export async function endExpired() {
+  const rows = await many(
+    `UPDATE purchases p SET status = 'ended' FROM shop_items i
+     WHERE i.sku = p.sku AND i.kind = 'subscription' AND p.status IN ('active', 'canceled') AND p.renews_at <= NOW() RETURNING p.id`,
+  );
+  return rows.length;
+}
+
+// People whose pass ends within `days` days (the app shows "ends in N days, extend"; a push can follow).
+export const endingSoon = (userId, days = 3) =>
+  many(
+    `SELECT p.sku, p.renews_at FROM purchases p JOIN shop_items i ON i.sku = p.sku
+     WHERE p.user_id = $1 AND i.kind = 'subscription' AND p.status = 'active' AND p.renews_at BETWEEN NOW() AND NOW() + make_interval(days => $2)`,
+    [userId, days],
+  );

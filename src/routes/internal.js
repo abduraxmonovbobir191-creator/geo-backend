@@ -184,7 +184,7 @@ router.post(
 );
 
 // Nexly and Nexgram show Nex Map's subscription and items with a buy button (1-2 taps, the person confirms in that app).
-// The coins still come from the one Nex ID wallet and what is bought works only in Nex Map; `source` records the app.
+// The Stars still come from the one Nex ID wallet and what is bought works only in Nex Map; `source` records the app.
 router.get('/shop', route(async (req, res) => res.json(await shopFor(await actingUser(req)))));
 
 router.post(

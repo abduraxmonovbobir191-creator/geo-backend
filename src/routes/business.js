@@ -9,7 +9,7 @@ import * as wallet from '../lib/wallet.js';
 import { sessionOnly } from '../middleware/auth.js';
 import { PLACE_CATEGORIES } from './places.js';
 
-// Businesses on the map: claim a place, fill its card, buy a Top position or a branded pin with Nex Coins (Nex ID wallet),
+// Businesses on the map: claim a place, fill its card, buy a Top position or a branded pin with Stars (Nex ID wallet),
 // read the statistics. Paid positions are always labelled as ads (see places.js); reviews are independent of them.
 const router = Router();
 const me = (req) => one('SELECT * FROM users WHERE id = $1', [req.auth.userId]);
@@ -143,7 +143,7 @@ router.post(
       );
       res.status(201).json({ id: row.id, plan: plan.code, kind: row.kind, tier: row.tier, expiresAt: row.expires_at });
     } catch (err) {
-      await wallet.refund(ref).catch(() => {}); // never keep coins without the position
+      await wallet.refund(ref).catch(() => {}); // never keep Stars without the position
       if (err.code === '23505') throw new HttpError(409, 'slot_taken', 'This position is taken');
       throw err;
     }

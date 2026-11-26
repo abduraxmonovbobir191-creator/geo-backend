@@ -45,34 +45,20 @@ Nex Map bitta ekotizimning qismi: **hisob bitta, Nex ID** (`sub` bo'yicha), Nexl
   `GET /activities/{id}/card` (postga havola kartasi), `POST /friends/sync` (o'zaro obunachilar Nex Map do'sti bo'ladi).
   Jonli lokatsiya, ghost rejim va do'stlarga mo'ljallangan mashg'ulotlar bu yerdan **hech qachon** chiqmaydi.
 
-## Obuna va xaridlar (hammasi Nex ID hamyonida)
+## Obuna va xaridlar (hammasi Stars bilan, Nex ID hamyonida)
 
-Pul faqat Nex ID'da: Nex Map tanga sotmaydi va saqlamaydi, har bir to'lov Nex ID hamyonidan `charge` bilan yechiladi
-(`ref` bilan, qayta urinish ikki marta yechmaydi). Tanga sotib olish: `walletUrl` (Nex ID).
+Bitta valyuta: **Stars** (hamma Nex ilovasida bir xil). Stars App Store / Google Play orqali sotib olinadi va Nex ID hamyoniga tushadi;
+Nex Map hech narsa saqlamaydi, to'lov Nex ID `charge` bilan yechiladi (`ref` bilan, qayta urinish ikki marta yechmaydi).
 
-- `GET /v1/shop`: katalog (`plus` obuna, `themes`, `pins`, `export`, `api_keys`), nima sotib olingani, Nex ID balansi.
-- `POST /v1/shop/buy {sku, price, key}`: **bitta tugma**. `price` ko'rsatilgan narx (o'zgargan bo'lsa 409 `price_changed`),
-  `key` qayta urinishda bir marta to'lash uchun. Tanga yetmasa 402 `insufficient_funds` + `walletUrl`.
-- `POST /v1/shop/subscriptions/{sku}/cancel | resume`: bekor qilish to'langan davr oxirigacha ishlaydi; yangilanish har 10 daqiqada
-  tekshiriladi, tanga yetmasa obuna tugaydi.
-- Sotib olingan narsa **faqat Nex Map'da** ishlaydi: `GET /v1/me` da `entitlements` (Nex ID `perks` + Nex Map xaridlari).
+- `GET /v1/shop`: katalog (`plus` 30 kunlik pass, `themes`, `pins`, `export`, `api_keys`), nima sotib olingani, Stars balansi, hamyon havolasi.
+- `POST /v1/shop/buy {sku, price, key}`: **bitta tugma**. `price` ko'rsatilgan narx (o'zgargan bo'lsa 409 `price_changed`), `key` qayta urinishda bir marta
+  to'lash uchun. Stars yetmasa 402 `insufficient_funds` + `walletUrl`. **Plus** ishlab turganda yana bosilsa kunlari qo'shiladi (30 + 30).
+- Hech narsa o'zi yangilanmaydi (do'kon qoidalari): pass tugasa o'zi to'xtaydi, tugashiga 3 kun qolganda ilova eslatadi, bitta tugma uzaytiradi.
+- Sotib olingan narsa **faqat Nex Map'da** ishlaydi: `GET /v1/me` da `entitlements` (Nex ID `perks` + Nex Map xaridlari), Nexly ichidagi Nex Map tabida ham, alohida Nex Map ilovasida ham.
   API kalit bilan xarid qilib bo'lmaydi.
-- Narxlar `shop_items` jadvalida (tanga), admin xohlagan payt o'zgartiradi.
-- Nexly va Nexgram'da ham shu tugma: `GET /internal/v1/shop`, `POST /internal/v1/shop/buy` (`X-Service-Key` + `X-Nexid-Sub`).
-  Ilova foydalanuvchidan tasdiq olgandan keyingina chaqiradi; xarid `purchases.source` da `nexly` / `nexgramm` deb yoziladi.
-
-## Jonli holat va har bir do'st uchun maxfiylik
-
-Do'st qanday ko'rishini **server** hal qiladi (aniq nuqta xira yoki muzlatilgan do'stga umuman yetib bormaydi).
-
-- `PUT /v1/friends/{userId}/sharing {mode}`: `precise` (aniq), `blurred` (~1 km katak, 700 m radius), `frozen` (shu paytdagi nuqta qotib qoladi),
-  `hidden` (hech narsa ko'rinmaydi) yoki `default`. `GET /v1/friends` da `sharing` (siz unga qanday ko'rinasiz) va `location` (u sizga nimani ko'rsatgan).
-- `GET/PUT /v1/me/sharing {defaultMode, activity, steps}`: umumiy rejim va sezgir qo'shimchalar (harakat holati, quvvatlanish, "N daqiqadan beri shu yerda";
-  qadamlar alohida). Hammasi **standartda o'chiq**; xira rejimda aniq joyni oshkor qiladigan maydonlar berilmaydi.
-- `PUT /v1/me/location` endi `activity` (still | walking | vehicle | sleeping), `isCharging`, `stepsToday` ham qabul qiladi; "qancha vaqtdan beri" ni
-  server o'zi hisoblaydi (80 m doira).
-- `PUT /v1/me/status {text, hours}`: qisqa status ("Kofe"), o'zi tugaydi (standart 8 soat).
-- Socket.IO: `friend:location` har bir do'stga uning ko'rinishida yuboriladi; rejim o'zgarsa `friend:location_hidden`.
+- Narxlar `shop_items` jadvalida (Stars), admin xohlagan payt o'zgartiradi.
+- Nexly va Nexgram'da ham shu tugma: `GET /internal/v1/shop`, `POST /internal/v1/shop/buy` (`X-Service-Key` + `X-Nexid-Sub`);
+  xarid `purchases.source` da `nexly` / `nexgramm` deb yoziladi.
 
 ## Biznes joylar (Yandex / Snap Map uslubida)
 
