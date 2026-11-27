@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { recordEfforts } from '../lib/segments.js';
 import { z } from 'zod';
 import { many, one } from '../db.js';
 import { badRequest, idParam, notFound, parse, route } from '../lib/http.js';
@@ -154,6 +155,8 @@ router.post(
         JSON.stringify(downsample(points, PREVIEW_POINTS)),
       ],
     );
+    // Segments this track rode get an effort (the leaderboards fill in by themselves)
+    await recordEfforts({ activityId: row.id, userId: req.auth.userId, type: input.type, points: points.map((p) => [p.lat, p.lng, p.t, p.ele ?? null]) }).catch(() => {});
     const created = await loadVisible(req.auth.userId, row.id);
     res.status(201).json(serializeActivity(created));
   }),

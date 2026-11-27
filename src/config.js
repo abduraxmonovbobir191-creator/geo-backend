@@ -50,6 +50,8 @@ export const config = {
   sessionServices: (env.SESSION_SERVICES || 'nexly').split(',').map((s) => s.trim()).filter(Boolean),
   // Alert kinds this server does not allow (e.g. camera,police where such posts are banned by law)
   alertDisabledKinds: (env.ALERT_DISABLED_KINDS || '').split(',').map((s) => s.trim()).filter(Boolean),
+  // The heatmap shows a cell only where this many different people moved (privacy)
+  heatMinUsers: Number(env.HEAT_MIN_USERS || 3),
   // Own Valhalla routing server (deploy/planet). Without it /v1/route answers 503 routing_unavailable.
   routingUrl: (env.ROUTING_URL || '').replace(/\/+$/, ''),
   rateLimit: {

@@ -164,3 +164,9 @@ src/
   lib/geo.js      masofa va mashg'ulot statistikasi hisoblash
 test/             avtomatik testlar
 ```
+
+## Segments, clubs, challenges, heatmap (Strava-style)
+- `POST /v1/segments {name, activityId, from, to}` cuts a segment (200 m–50 km) from your own activity; new activities of the same type that ride it get an effort automatically. `GET /v1/segments/nearby`, `GET /v1/segments/:id` (leaderboard, KOM/QOM, your place). Boards respect activity visibility.
+- `/v1/clubs` (create, search, join, leave), `POST /v1/clubs/:id/challenges` (distance | time | count; a sponsor must be the owner's own business place and is shown as an ad), `GET /v1/challenges/:id` (private activities never count).
+- `GET /v1/heatmap?minLat&maxLat&minLng&maxLng` shows ~100 m cells only where `HEAT_MIN_USERS` (3) different people moved in public activities.
+- Migration `008_sport_radius.sql` also adds `offers.radius_m` for radius-based offers (endpoint to follow).

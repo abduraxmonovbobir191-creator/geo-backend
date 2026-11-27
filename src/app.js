@@ -21,6 +21,7 @@ import internalRoutes from './routes/internal.js';
 import routeRoutes from './routes/route.js';
 import businessRoutes, { placeExtras } from './routes/business.js';
 import { businessOffers, offerRoutes, publicOffers } from './routes/offers.js';
+import { challengeRoutes, clubRoutes, heatmapRoutes, segmentRoutes } from './routes/sport.js';
 import alertRoutes from './routes/alerts.js';
 import shopRoutes from './routes/shop.js';
 import apiKeyRoutes from './routes/apiKeys.js';
@@ -108,6 +109,10 @@ export function createApp() {
   v1.use('/api-keys', apiKeyRoutes);
   v1.use('/shop', shopRoutes);
   v1.use('/alerts', alertRoutes);
+  v1.use('/segments', segmentRoutes);
+  v1.use('/clubs', clubRoutes);
+  v1.use('/challenges', challengeRoutes);
+  v1.use('/heatmap', heatmapRoutes);
 
   app.use('/v1', v1);
   app.use('/internal/v1', internalRoutes);
